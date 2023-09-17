@@ -1,24 +1,13 @@
-// 생활코딩(egoing)님의 nodejs 강의: node.js 기초
+// 생활코딩(egoing)님의 WEB3 node.js - Cookie and Auth 강의
 // 
-// 블로그: https://opentutorials.org/module/3549/21032
-// 유튜브: https://www.youtube.com/playlist?list=PLuHgQVnccGMA9QQX5wqj6ThK7t2tsGxjm
-//
-// pm2 사용법: https://www.youtube.com/watch?v=KzjTCREOIkk&list=PLuHgQVnccGMA9QQX5wqj6ThK7t2tsGxjm&index=39
-// 설치: npm install pm2 -g
-// 실행: pm2 start main.js --watch
-// 정지: pm2 stop main(id)
-// 전부정지: pm2 kill
-// 목록: pm2 list
-// 모니터링: pm2 monit (나갈 때는 q)
-// 내부관찰: pm2 log (나갈 때는 Ctrl + C)
-// 실행하여 관찰도 하면서 + 로그도 확인: pm2 start .\main.js --watch --no-daemon
-// ==> 이경우 문제점: 가끔 Ctrl + C로도 꺼지지 않는다 + ./data/파일 생성시 node가 꺼졌다가 켜진다
-// ==> 해결법:  pm2 start .\main.js --watch --ignore-watch="data/* lib/*" --no-daemon
+// 블로그: https://opentutorials.org/module/3630
+// 유튜브: https://www.youtube.com/playlist?list=PLuHgQVnccGMDo8561VLWTZox8Zs3K7K_m
+
 
 
 var http = require('http');
 var fs = require('fs');
-var url = require('url');
+const url = require('url');
 const path = require('path');
 var qs = require('querystring');
 
@@ -34,6 +23,7 @@ var cookie = require('cookie');
 const EMAIL = 'muzom97@naver.com';
 const PASSWORD = '1111';							// cookie로 파싱된 값은 string임
 const NICK = 'muzom97'
+
 
 
 // 쿠키로 로그인 검증하는 함수
@@ -57,14 +47,14 @@ function authenticate(request, response) {
 
 var app = http.createServer(
 	function(request,response){
-    var _url = request.url;
-		// console.log(_url);						// /?id=HTML
+    var _url = request.url;					// http://localhost:3000/author/update?id=1
+		// console.log(_url);						// /author/update?id=1
 
-		var queryData = url.parse(_url, true).query;
-		// console.log(queryData);					// [Object: null prototype] { id: 'HTML' }
-		// console.log(queryData.id);				// HTML
+		var pathname = url.parse(_url).pathname;		// /author/update
+		var query = url.parse(_url).search;					// ?id=1
 
-		var pathname = url.parse(_url, true).pathname;
+		var params = new URLSearchParams(query);		// URLSearchParams { 'id' => '1' }
+		var queryId = params.get('id');							// (주의) 해당 속성이 없는 경우 undefined가 아니라 null임!!
 
 		// 쿠키로 로그인 검증 결과
 		var isLoggedOn = authenticate(request, response);
@@ -75,7 +65,7 @@ var app = http.createServer(
 		if(pathname ==='/') {
 
 			// 홈(WEB)
-			if(queryData.id === undefined) {
+			if(queryId === null) {		// url모듈 제거하고 URL을 쓰면서 undefined를 null로 변경
 				fs.readdir('./data', function(err, fileList) {
 					// console.log(fileList);					// [ 'CSS', 'HTML', 'JavaScript' ]
 					var title = 'Welcome';
@@ -94,9 +84,9 @@ var app = http.createServer(
 				fs.readdir('./data', function(err, fileList) {
 					// console.log(fileList);					// [ 'CSS', 'HTML', 'JavaScript' ]
 
-					var filteredId = path.parse(queryData.id).base;
+					var filteredId = path.parse(queryId).base;
 					fs.readFile(`./data/${filteredId}`, 'utf-8', function(err, description) {
-						var title = queryData.id;
+						var title = queryId;
 						var sanitizedTitle = sanitizeHtml(title);
 						var sanitizedDescription = sanitizeHtml(description);
 						
@@ -171,11 +161,10 @@ var app = http.createServer(
 
 			// 서버에 더이상 들어오는 data가 없으면 정보수신이 끝났으므로 이때 호출되는 event listener
 			request.on('end', function(data) {
-				var post = qs.parse(body);
-				// console.log(post);					//  [Object: null prototype] { title: 'node.js', description: '노드가 짱짱맨' }
+				var post = new URLSearchParams(body);
+				var title = post.get('title');
+				var description = post.get('description');
 
-				var title = post.title;
-				var description = post.description;
 				fs.writeFile(`./data/${title}`, description, 'utf-8', function(err) {
 					if(err) throw err;
 
@@ -198,7 +187,7 @@ var app = http.createServer(
 			fs.readdir('./data', function(err, fileList) {
 				// console.log(fileList);					// [ 'CSS', 'HTML', 'JavaScript' ]
 
-				var filteredId = path.parse(queryData.id).base;
+				var filteredId = path.parse(queryId).base;
 				fs.readFile(`./data/${filteredId}`, 'utf-8', function(err, description) {
 					var title = filteredId;
 					
@@ -243,30 +232,11 @@ var app = http.createServer(
 
 			// 서버에 더이상 들어오는 data가 없으면 정보수신이 끝났으므로 이때 호출되는 event listener
 			request.on('end', function(data) {
-				var post = qs.parse(body);
-				// console.log(post);					//  [Object: null prototype] { title: 'node.js', description: '노드가 짱짱맨' }
+				var post = new URLSearchParams(body);
 
-				var id = post.id;
-				var title = post.title;
-				var description = post.description;
-				// console.log(post);
-
-				/*
-				// 일단 파일을 쓰고
-				fs.writeFile(`./data/${title}`, description, 'utf-8', function(err) {
-					if(err) throw err;
-
-					response.writeHead(302, {Location: `/?id=${title}`});
-					response.end();
-				});
-
-				// id와 title이 다르다면 id(예전 title)로 된 파일을 지워준다
-				if(id !== title) {
-					fs.rm(`./data/${id}`, function(err) {
-						if(err) throw err;
-					});						
-				}
-				*/
+				var id = post.get('id');
+				var title = post.get('title');
+				var description = post.get('description');
 
 				fs.rename(`data/${id}`, `data/${title}`, function(error){
 					if(error) throw error;
@@ -302,10 +272,9 @@ var app = http.createServer(
 
 			// 서버에 더이상 들어오는 data가 없으면 정보수신이 끝났으므로 이때 호출되는 event listener
 			request.on('end', function(data) {
-				var post = qs.parse(body);
-				// console.log(post);					//  [Object: null prototype] { title: 'node.js', description: '노드가 짱짱맨' }
+				var post = new URLSearchParams(body);
+				var id = post.get('id');
 
-				var id = post.id;
 				var filteredId = path.parse(id).base;
 				fs.unlink(`./data/${filteredId}`, function(err){
 					response.writeHead(302, {Location: `/`});
@@ -313,6 +282,8 @@ var app = http.createServer(
 				});
 			});
 		}
+
+
 
 		// 로그인 화면(/login)
 		else if(pathname === '/login') {
@@ -324,12 +295,16 @@ var app = http.createServer(
 				var html = template.html(title, list, 
 					`<form action="login_process" method="post">
 						<p>
-						<input type="text" name="email" placeholder="email">
-						<input type="password" name="password" placeholder="password">
-						<input type="submit">
+							<input type="text" name="email" placeholder="email">
+						</p>
+						<p>
+							<input type="password" name="password" placeholder="password">
+						</p>
+						<p>
+							<input type="submit" value="로그인">
 						</p>
 					</form>`, 
-					`<a href="/create">create</a>`,
+					`<a href="/create">Create</a>`,
 					// isLoggedOn
 				);
 	
@@ -337,6 +312,8 @@ var app = http.createServer(
 				response.end(html);
 			});
 		}
+
+
 
 		// 로그인 처리(/login_process)
 		else if(pathname === '/login_process') {
@@ -353,10 +330,10 @@ var app = http.createServer(
 
 			// 서버에 더이상 들어오는 data가 없으면 정보수신이 끝났으므로 이때 호출되는 event listener
 			request.on('end', function(data) {
-				var post = qs.parse(body);
+				var post = new URLSearchParams(body);
 
-				var email = post.email;
-				var password = post.password;
+				var email = post.get('email');
+				var password = post.get('password');
 
 				// 로그인 성공시
 				if(email === EMAIL && password === PASSWORD) {
@@ -366,7 +343,7 @@ var app = http.createServer(
 					// 모듈: PBKDF2, bcrypt 등
 					// ==============================================================
 					response.writeHead(302, {
-						'Set-Cookie' : [
+						'Set-Cookie': [
 							`email=${email}`,
 							`password=${password}`,
 							`nickname=${NICK}`
@@ -398,10 +375,7 @@ var app = http.createServer(
 
 			// 서버에 더이상 들어오는 data가 없으면 정보수신이 끝났으므로 이때 호출되는 event listener
 			request.on('end', function(data) {
-				var post = qs.parse(body);
-
-				var email = post.email;
-				var password = post.password;
+				var params = new URLSearchParams(body);
 
 				// response에 /로 redirection 하면서 + 쿠키 삭제
 				response.writeHead(302, {
